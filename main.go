@@ -1,25 +1,16 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 
 	"cortex/backend/config"
 	"cortex/backend/handlers"
-	"cortex/backend/invites"
 )
-
-func init() {
-	// ----------------------------------
-	// Invite codes (DEV / PRIVATE BETA)
-	// ----------------------------------
-	invites.CreateInvite("alpha-1", 7*24*time.Hour)
-	invites.CreateInvite("alpha-2", 7*24*time.Hour)
-	invites.CreateInvite("alpha-3", 7*24*time.Hour)
-}
 
 func main() {
 	r := gin.New()
@@ -29,7 +20,9 @@ func main() {
 	// ----------------------------------
 	r.Use(cors.New(cors.Config{
 		AllowOriginFunc: func(origin string) bool {
-			return strings.HasPrefix(origin, "http://localhost")
+			return strings.Contains(origin, "localhost") ||
+				strings.Contains(origin, "vercel.app") ||
+				strings.Contains(origin, "onrender.com")
 		},
 		AllowMethods: []string{
 			"GET",
@@ -71,7 +64,7 @@ func main() {
 	r.Use(gin.Recovery())
 
 	// ----------------------------------
-	// 4. Global Routes
+	// 4. Health Routes
 	// ----------------------------------
 	r.GET("/health", handlers.Health)
 	r.GET("/ready", handlers.Ready)
@@ -81,10 +74,6 @@ func main() {
 	// ----------------------------------
 	v1 := r.Group("/v1")
 	{
-		// Invite redemption
-		v1.POST("/invite/:code", handlers.RedeemInvite)
-
-		// Thought analysis
 		v1.OPTIONS("/analyze-thought", func(c *gin.Context) {
 			c.Status(204)
 		})
@@ -92,7 +81,12 @@ func main() {
 	}
 
 	// ----------------------------------
-	// 6. Start Server
+	// 6. Start Server (RENDER SAFE)
 	// ----------------------------------
-	r.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	r.Run(":" + port)
 }
